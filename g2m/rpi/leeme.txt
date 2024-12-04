@@ -1,0 +1,5 @@
+
+EL archivo dist.tgz es la version que esta instalada en la pi.
+El archivo guiador2m.cfg es el de conf. que etsa instalado en la pi,
+
+El directorio en le pi de estos archivos es: mntp3/app
