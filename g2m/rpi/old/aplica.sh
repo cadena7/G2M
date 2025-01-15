@@ -4,6 +4,31 @@ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lo
 
 dt=$(pwd)
 
+cd /home/guiador
+
+sudo mount -o ro /dev/mmcblk0p3 mntp3
+
+sleep 1
+
+cd mntp3/app
+
+dt=$(pwd)
+
+if [ -e dist.tgz ]
+then
+  echo "Ok"
+else
+ echo "No existe dist.tgz" 
+ return 0
+fi
+
+
+
+
+cd /dev/shm
+tar xvfz ${dt}/dist.tgz
+
+cp ${dt}/guiador2m.cfg /dev/shm/dist
 
 function check_ipaddr () {
   # Here we look for an IP(v4|v6) address when doing ip addr
@@ -18,20 +43,15 @@ function check_ipaddr () {
   wc -l
 }
 
-#until [ `check_ipaddr` -gt 1 ]; 
-#do
-#  echo "esperando"
-#  sleep 2
-#done
+until [ `check_ipaddr` -gt 1 ]; 
+do
+  echo "esperando"
+  sleep 2
+done
 
-echo "tengo ip"
-
-cd /home/guiador
-
-if [ -e /home/guiador/dist/scripts/aplica_dist.sh ]
+if [ -e dist/scripts/aplica_dist.sh ]
 then
   cd dist/scripts
-  echo "corriendo aplica_dist.sh"
   bash aplica_dist.sh
 fi
 
