@@ -1,13 +1,16 @@
-# G2M
-Guiador del 2m
-
 Fecha   10 enero 2024
 
 *****************
+
 ## en la version de edgar aqui es el directorio de trabajo
 El directorio en el pi de estos archivos es: /home/guiador/dist
 
+#Para hacer una conexión con una terminal:
+ssh guiador@192.168.0.205
+contraseña p4guiador
+
 *****************
+
 #En crontab arranca este comando:
 # m h  dom mon dow   command
 @reboot         sh -c "cd /home/guiador/dist/scripts;bash aplica.sh > /dev/null"
@@ -21,20 +24,24 @@ y para ver que se haya guardado se usa
 crontab -l
 
 *****************
+
 el archivo aplica.sh basicamente llama a otro archivo que se llama aplica_dist.sh y luego ese a su vez llama al archivo config_ips_g2m.sh
 donde se encuentra la configuracion de las pocketbeagles en cuanto a cada eje, este archivo se debe modificar cuando se cambia
 de pocketbeagle porque cada una tiene su identificador de hardware
 
 *****************
+
 el programa que lee el archivo de entonacion guiador2m.cfg se llama instruccionesguiador.py
 
 el archivo guiador2m.cfg guarda la entonacion deseada de cada eje, los comandos estan descritos en el reporte tecnico de chava de servoPB
 
 *****************
+
 el archivo de configuracion de supervisor se encuentra en
 /etc/supervisor/conf.d
 
 *****************
+
 Para enviar comandos al guiador desde sonaja:
 
 hacer source desde la consola del siguiente scripts
@@ -97,3 +104,13 @@ echo ESTADO | nc 192.168.10.2 9095
 while sleep 1; do echo ESTADO | nc 192.168.9.2 9095; done
 
 *****************
+
+#Para hacer una conexión con una terminal:
+ssh -p 2276 debian@192.168.9.2 
+contraseña temppwd
+
+su
+root
+
+*****************
+
