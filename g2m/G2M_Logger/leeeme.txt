@@ -1,0 +1,30 @@
+ 
+Para mantenerlo corriendo en segundo plano (y que no dependa de la terminal):
+
+
+nohup python3 mqtt_logger.py &
+
+
+La salida del script se guardará en un archivo nohup.out en el mismo directorio.
+
+
+Para ejecutarlo directamente en la terminal (y ver la salida en vivo):
+
+
+python3 mqtt_logger.py
+
+
+Puedes detenerlo con Ctrl+C.
+
+
+Para detener el script manualmente (si es necesario):
+
+    Encuentra el ID del proceso (PID) con 
+    
+    pgrep -f mqtt_logger.py o ps aux | grep mqtt_logger.py.
+    
+
+    Mata el proceso con
+    kill -9 <PID> 
+    
+    El signal_handler debería encargarse de un cierre limpio.

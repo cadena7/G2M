@@ -1,0 +1,18 @@
+Fecha   9 mayo 2025
+
+*************************************************
+Fix el bug que borra los archivos de logs del journal
+*************************************************
+
+sudo journalctl --disk-usage
+sudo journalctl --rotate
+sudo journalctl --vacuum-time=1s
+sudo journalctl --disk-usage
+
+
+*************************************************
+revisión completa del filesystem, para detectar y reparar posibles errores ocultos
+*************************************************
+
+sudo touch /forcefsck
+sudo reboot
