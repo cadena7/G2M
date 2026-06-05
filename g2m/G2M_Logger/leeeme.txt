@@ -1,30 +1,172 @@
- 
-Para mantenerlo corriendo en segundo plano (y que no dependa de la terminal):
+G2M Logger
+==========
+
+Este proyecto registra datos del guiador del telescopio de 2 m desde MQTT y los
+guarda en una base de datos SQLite para revisar el comportamiento de los ejes
+AR, DEC y FOCO durante la operacion.
 
 
-nohup python3 mqtt_logger.py &
+Dependencias
+------------
+
+Para capturar datos MQTT:
+
+    pip3 install paho-mqtt
+
+Para exportar a Excel:
+
+    pip3 install pandas openpyxl
+
+Para graficar:
+
+    pip3 install pandas matplotlib seaborn
 
 
-La salida del script se guardará en un archivo nohup.out en el mismo directorio.
+Arranque y parada en Ubuntu
+---------------------------
+
+Los scripts `start.sh` y `stop.sh` facilitan correr el logger en segundo plano.
+Ambos deben ejecutarse desde una terminal en la carpeta del proyecto.
+
+Dar permisos de ejecucion si hace falta:
+
+    chmod +x start.sh stop.sh
+
+Arrancar el logger:
+
+    ./start.sh
+
+Esto ejecuta `mqtt_logger.py` con `nohup`, guarda la salida en `nohup.out` y
+guarda el PID del proceso en `mqtt_logger.pid`.
+
+Detener el logger:
+
+    ./stop.sh
+
+Esto intenta detener el proceso con `kill`. Si despues de unos segundos el
+proceso sigue activo, fuerza el cierre con `kill -9`.
 
 
-Para ejecutarlo directamente en la terminal (y ver la salida en vivo):
+Ejecucion manual
+----------------
+
+Tambien se puede ejecutar directamente en la terminal para ver la salida en vivo:
+
+    python3 mqtt_logger.py
+
+Para detenerlo manualmente, usar Ctrl+C.
+
+Si se arranco sin `stop.sh`, se puede buscar y matar el proceso asi:
+
+    pgrep -f mqtt_logger.py
+    kill <PID>
+
+Si el proceso no responde:
+
+    kill -9 <PID>
 
 
-python3 mqtt_logger.py
+Scripts del proyecto
+--------------------
+
+`mqtt_logger.py`
+
+Script principal. Se conecta al broker MQTT configurado en el archivo, escucha
+el topico del guiador y guarda las lecturas `AR`, `DEC` y `FOCO` en
+`mqtt_data.db`.
+
+Configuracion principal dentro del script:
+
+    DATABASE_NAME = "mqtt_data.db"
+    TABLE_NAME = "sensor_readings"
+    MQTT_BROKER_HOST = "192.168.0.237"
+    MQTT_BROKER_PORT = 1883
+    MQTT_TOPIC = "oan/control/2m/guiador/motores/status"
+    DURATION_HOURS = 12
+    SAMPLING_INTERVAL_SECONDS = 1
+
+Si la base de datos no existe, el script la crea automaticamente en el
+directorio desde donde se ejecuta. La tabla actual contiene:
+
+    id
+    timestamp
+    ar
+    dec
+    foco
 
 
-Puedes detenerlo con Ctrl+C.
+`start.sh`
+
+Arranca `mqtt_logger.py` en segundo plano con `nohup`. Evita arrancar otro
+proceso si ya existe un PID activo en `mqtt_logger.pid`.
+
+Archivos que usa o genera:
+
+    mqtt_logger.pid
+    nohup.out
 
 
-Para detener el script manualmente (si es necesario):
+`stop.sh`
 
-    Encuentra el ID del proceso (PID) con 
-    
-    pgrep -f mqtt_logger.py o ps aux | grep mqtt_logger.py.
-    
+Detiene el logger. Primero usa el PID guardado en `mqtt_logger.pid`. Si ese
+archivo no existe, busca procesos con:
 
-    Mata el proceso con
-    kill -9 <PID> 
-    
-    El signal_handler debería encargarse de un cierre limpio.
+    pgrep -f "python3 mqtt_logger.py"
+
+Luego manda `kill` y, si el proceso sigue activo, manda `kill -9`.
+
+
+`data2excel.py`
+
+Lee toda la tabla `sensor_readings` de `mqtt_data.db` y la exporta a:
+
+    sensor_data.xlsx
+
+Uso:
+
+    python3 data2excel.py
+
+El archivo Excel se sobrescribe cada vez que se ejecuta.
+
+
+`plot_data.py`
+
+Lee la base de datos y grafica las series temporales de `AR`, `DEC` y `FOCO`.
+
+Uso:
+
+    python3 plot_data.py
+
+Requiere un entorno con soporte grafico para mostrar la ventana de Matplotlib.
+
+
+`clean_db.py`
+
+Borra registros anteriores a una fecha de corte. La fecha se configura dentro
+del archivo en la variable:
+
+    date_to_delete_before = "2025-06-01"
+
+Uso:
+
+    python3 clean_db.py
+
+Importante: este script modifica la base de datos y elimina registros de forma
+permanente. Conviene hacer una copia de `mqtt_data.db` antes de usarlo.
+
+
+Archivos de datos
+-----------------
+
+`mqtt_data.db`
+
+Base de datos SQLite con las lecturas historicas del guiador.
+
+`sensor_data.xlsx`
+
+Archivo Excel generado por `data2excel.py`.
+
+`sensor_data_.xlsx`
+
+Archivo Excel historico presente en la carpeta. No es usado directamente por los
+scripts actuales.

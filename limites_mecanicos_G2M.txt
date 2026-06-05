@@ -1,0 +1,23 @@
+Limites Mecanicos G2M después de Inicializar Ejes
+
+Positivos
+DEC
+1116.11
+
+AR
+1744.23
+
+FOCO
+76.31
+
+
+Negativos
+DEC
+-2482.26
+
+AR
+-1911.02
+
+
+FOCO
+-49.39

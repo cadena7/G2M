@@ -36,7 +36,7 @@ def plot_sensor_data():
     try:
         conn = sqlite3.connect(db_path)
         # Leer los datos de la tabla en un DataFrame de pandas
-        df = pd.read_sql_query(f"SELECT timestamp, ar, dec, foco, zoom FROM {TABLE_NAME} ORDER BY timestamp", conn)
+        df = pd.read_sql_query(f"SELECT timestamp, ar, dec, foco FROM {TABLE_NAME} ORDER BY timestamp", conn)
         conn.close()
 
         if df.empty:
@@ -49,7 +49,7 @@ def plot_sensor_data():
         # --- Crear los gráficos ---
 
         plt.style.use('seaborn-v0_8-darkgrid') # Un estilo visual agradable
-        fig, axes = plt.subplots(nrows=4, ncols=1, figsize=(12, 16), sharex=True) # 4 subplots, compartiendo el eje X
+        fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(12, 12), sharex=True) # 3 subplots, compartiendo el eje X
 
         # Gráfico para AR
         axes[0].plot(df['timestamp'], df['ar'], label='AR', color='blue')
@@ -69,12 +69,7 @@ def plot_sensor_data():
         axes[2].set_ylabel('FOCO')
         axes[2].legend()
 
-        # Gráfico para ZOOM
-        axes[3].plot(df['timestamp'], df['zoom'], label='ZOOM', color='purple')
-        axes[3].set_title('Valores de ZOOM a lo largo del tiempo')
-        axes[3].set_ylabel('ZOOM')
-        axes[3].set_xlabel('Tiempo') # El eje X solo en el último subplot
-        axes[3].legend()
+        axes[2].set_xlabel('Tiempo') # El eje X solo en el último subplot
 
         # Ajustar el diseño para evitar superposiciones
         plt.tight_layout()

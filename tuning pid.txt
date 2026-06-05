@@ -1,0 +1,119 @@
+#entonacion beta
+ejedec DAX 0 RST FCMD
+ejedec KPX 70 KIX 0.001 KDX 1 ILX 4000 FCMD
+ejedec VX= 2 AX= 0.001  FCMD
+ejedec CGANX 500 2  FCMD
+ejedec ERROR_MAXX 0 CONTROL_PIDX FCMD
+ejedec X= 3000  FCMD
+
+
+
+#entonacion beta
+ejear DAX 0 RST FCMD
+ejear KPX 80 KIX 0.001 KDX 1 ILX 4000 FCMD
+ejear VX= 5 AX= 0.01  FCMD
+ejear ERROR_MAXX 0 CONTROL_PIDX FCMD
+ejear X= -100000  FCMD
+
+
+
+#entonacion beta
+ejefoco DAX 0 RST FCMD
+ejefoco KPX 80 KIX 0.001 KDX 1 ILX 4000 FCMD
+ejefoco VX= 5 AX= 0.01  FCMD
+ejefoco ERROR_MAXX 0 CONTROL_PIDX FCMD
+ejefoco X= 100000  FCMD
+
+
+
+
+
+
+#ejemplos busca inicios de ejes
+ag2m RESTABLECE_BANDERA_ERR  FCMD
+ag2m BUSCA_CENTRO_FOCO  FCMD
+ag2m BUSCA_CENTRO_AR  FCMD
+ag2m BUSCA_CENTRO_DEC  FCMD
+
+
+
+
+edog2mj
+
+
+
+
+ejedec X= 0  FCMD
+ejear X= 0  FCMD
+ejefoco X= 0  FCMD
+
+
+
+ejedec X= 10000  FCMD
+ejear X= 10000  FCMD
+ejefoco X= 10000  FCMD
+
+
+
+ejedec X= -10000  FCMD
+ejear X= -10000  FCMD
+ejefoco X= -10000  FCMD
+
+
+
+
+#abrir lazos de control
+ejedec DAX 0 RST FCMD
+ejear DAX 0 RST FCMD
+ejefoco DAX 0 RST FCMD
+
+
+
+
+#ejemplo mover libremente el eje dec
+ejedec RST_S ERROR_MAXX 0
+ejedec DAX -5000; sleep 2; ejedec DAX 0
+
+ejedec RST_S ERROR_MAXX 0
+ejedec DAX 5000; sleep 2; ejedec DAX 0
+
+
+#ejemplo mover libremente el eje ar
+ejear RST_S ERROR_MAXX 0
+ejear DAX -5000; sleep 2; ejear DAX 0
+
+ejear RST_S ERROR_MAXX 0
+ejear DAX 5000; sleep 2; ejear DAX 0
+
+
+#ejemplo mover libremente el eje foco
+ejefoco RST_S ERROR_MAXX 0
+ejefoco DAX -5000; sleep 3; ejefoco DAX 0
+
+ejefoco RST_S ERROR_MAXX 0
+ejefoco DAX 5000; sleep 3; ejefoco DAX 0
+
+
+
+
+
+
+
+EDITAR
+PPMM Y ESC PLACA EN MOTGUI-2M.PY Y PARAMS_GSC.PY EN PC Y INSTRUCCIONESGUIADOR.PY EN RPI
+DEC
+AR Y FOCO
+ESC. PLACA.
+
+VERIFICAR SIGNOS EN TELESCOPIO, LOS OFFSETS DE TELESCOPIO AL VER LA IMAGEN DEL GUIADOR
+DEBEN COINCIDIR CON LOS OFFSETS DEL GUIADOR, SI EN GUIADOR VA HACIA OTRO LADO, HAY QUE EDITAR
+PPMM EN EL ARCHIVO DE LA RPI INSTRUCCIONESGUIADOR.PY Y PONERLE SIGNO NEGATIVO AL VALOR
+
+
+EN INSTRUCCIONESGUIADOR.PY
+Estan las posiciones de centros de cada eje que hay que ajustar al calibrar centro con estrella
+
+
+AJUSTAR BROKER MQTT EN ARCHIVOS:
+g84drvmqtt_edgar.py
+

@@ -33,7 +33,7 @@ import os # Para obtener la ruta del directorio de ejecución
 # --- Configuración ---
 DATABASE_NAME = "mqtt_data.db"
 TABLE_NAME = "sensor_readings"
-MQTT_BROKER_HOST = "192.168.0.1"
+MQTT_BROKER_HOST = "192.168.0.237"
 MQTT_BROKER_PORT = 1883
 MQTT_TOPIC = "oan/control/2m/guiador/motores/status"
 DURATION_HOURS = 12
@@ -66,24 +66,23 @@ def setup_database():
             timestamp TEXT,
             ar REAL,
             dec REAL,
-            foco REAL,
-            zoom REAL
+            foco REAL
         )
     ''')
     conn.commit()
     conn.close()
     print(f"Base de datos '{db_path}' y tabla '{TABLE_NAME}' configuradas.")
 
-def insert_data(ar, dec, foco, zoom):
+def insert_data(ar, dec, foco):
     """Inserta los datos en la base de datos."""
     db_path = os.path.join(os.getcwd(), DATABASE_NAME)
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
     cursor.execute(f'''
-        INSERT INTO {TABLE_NAME} (timestamp, ar, dec, foco, zoom)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (timestamp, ar, dec, foco, zoom))
+        INSERT INTO {TABLE_NAME} (timestamp, ar, dec, foco)
+        VALUES (?, ?, ?, ?)
+    ''', (timestamp, ar, dec, foco))
     conn.commit()
     conn.close()
 
@@ -114,11 +113,10 @@ def on_message(client, userdata, msg):
         ar = data.get("AR")
         dec = data.get("DEC")
         foco = data.get("FOCO")
-        zoom = data.get("ZOOM")
 
-        if all(x is not None for x in [ar, dec, foco, zoom]):
-            insert_data(ar, dec, foco, zoom)
-            print(f"[{current_time.strftime('%H:%M:%S')}] Datos recibidos e insertados: AR={ar}, DEC={dec}, FOCO={foco}, ZOOM={zoom}")
+        if all(x is not None for x in [ar, dec, foco]):
+            insert_data(ar, dec, foco)
+            print(f"[{current_time.strftime('%H:%M:%S')}] Datos recibidos e insertados: AR={ar}, DEC={dec}, FOCO={foco}")
             last_data_received_time = current_time # Actualizar el tiempo del último dato insertado
         else:
             print(f"Advertencia: JSON recibido no contiene todos los campos esperados: {payload_str}")
