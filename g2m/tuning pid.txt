@@ -115,5 +115,5 @@ Estan las posiciones de centros de cada eje que hay que ajustar al calibrar cent
 
 
 AJUSTAR BROKER MQTT EN ARCHIVOS:
-g84drvmqtt_edgar.py
+g2mdrvmqtt_edgar.py
 
