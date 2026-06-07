@@ -363,9 +363,10 @@ ejefoco ESTADO
 ejezoom ESTADO
 ```
 
-Estas funciones agregan `FCMD` automáticamente. No lo añada de nuevo.
-En cambio, todo comando crudo `EJEAR`, `EJEDEC`, `EJEFOCO` o `EJEZOOM`
-enviado mediante `ag2m` debe terminar explícitamente en `FCMD`.
+Estas funciones agregan `FCMD` automáticamente, por lo que el bloque
+transmitido al servo termina correctamente. Todo comando crudo `EJEAR`,
+`EJEDEC`, `EJEFOCO` o `EJEZOOM` enviado mediante `ag2m` debe incluir
+explícitamente `FCMD` al final.
 
 Catálogo del intérprete:
 
@@ -549,9 +550,9 @@ de asumir que el lazo se cierra al cargar el archivo.
 
 1. Seleccione un solo eje y confirme su IP.
 2. Abra una terminal de comandos y cargue `source g2m/fns_g2m.sh`.
-   Las funciones `ejear`, `ejedec`, `ejefoco` y `ejezoom` agregan el
-   terminador obligatorio `FCMD` automáticamente. Si usa `ag2m` para enviar
-   comandos crudos `EJE*`, escriba siempre `FCMD` al final.
+   Durante la entonación, escriba `FCMD` al final de cada instrucción directa
+   enviada al servo. Este terminador indica el final del bloque de comandos que
+   se enviará al eje.
 3. Abra otra terminal para retroalimentación continua:
 
    ```bash
@@ -573,80 +574,75 @@ de asumir que el lazo se cierra al cargar el archivo.
 > **PELIGRO - MOVIMIENTO FÍSICO:** todos los comandos de esta secuencia pueden
 > provocar movimiento. Empiece con desplazamientos y ganancias pequeños.
 
-El intérprete requiere `FCMD` para ejecutar cada instrucción directa de servo.
-Esta secuencia comprobada para DEC muestra el protocolo completo:
+Cada instrucción enviada directamente al servo durante la entonación debe
+terminar con `FCMD`. Este terminador indica el final del bloque de comandos que
+se enviará al eje.
+
+Secuencia utilizada para la entonación interactiva de DEC:
 
 ```bash
-source g2m/fns_g2m.sh
+# Abrir el lazo, detener la salida y restablecer el servo
+ejedec DAX 0 RST FCMD
 
-ag2m 'EJEDEC DAX 0 RST FCMD'
-ag2m 'EJEDEC KPX 70 KIX 0.001 KDX 1 ILX 4000 FCMD'
-ag2m 'EJEDEC VX= 2 AX= 0.001 FCMD'
-ag2m 'EJEDEC CGANX 500 2 FCMD'
-ag2m 'EJEDEC ERROR_MAXX 0 CONTROL_PIDX FCMD'
-ag2m 'EJEDEC X= 3000 FCMD'
+# Cargar parámetros PID, velocidad, aceleración y ganancia
+ejedec KPX 70 KIX 0.001 KDX 1 ILX 4000 FCMD
+ejedec VX= 2 AX= 0.001 FCMD
+ejedec CGANX 500 2 FCMD
+
+# Cerrar el lazo y enviar una posición deseada de prueba
+ejedec ERROR_MAXX 0 CONTROL_PIDX FCMD
+ejedec X= 3000 FCMD
 ```
 
-La misma secuencia usando la función `ejedec` se escribe sin `FCMD`, porque la
-función lo agrega al enviarla:
+> **Nota sobre las funciones del repositorio:** la secuencia anterior muestra
+> explícitamente el terminador requerido por el protocolo. Las funciones
+> `ejedec`, `ejear`, `ejefoco` y `ejezoom` definidas actualmente en
+> `g2m/fns_g2m.sh` ya agregan `FCMD` al transmitir. Al usar esas funciones sin
+> modificaciones, omita el `FCMD` escrito; el bloque enviado sí terminará con
+> él. Para enviar exactamente la sintaxis mostrada use, por ejemplo,
+> `ag2m 'EJEDEC X= 3000 FCMD'`.
+
+Para probar directamente posiciones deseadas en cuentas del codificador, use
+`X=` sobre el eje que se está entonando. Comience con desplazamientos pequeños
+respecto a la posición actual observada:
 
 ```bash
-ejedec DAX 0 RST
-ejedec KPX 70 KIX 0.001 KDX 1 ILX 4000
-ejedec VX= 2 AX= 0.001
-ejedec CGANX 500 2
-ejedec ERROR_MAXX 0 CONTROL_PIDX
-ejedec X= 3000
+ejedec X= 500 FCMD
+ejedec X= 0 FCMD
+ejedec X= -500 FCMD
+
+ejear X= 1000 FCMD
+ejear X= 0 FCMD
+
+ejefoco X= 1000 FCMD
+ejefoco X= 0 FCMD
 ```
 
-No escriba `ejedec ... FCMD`: produciría dos terminadores porque
-`g2m/fns_g2m.sh` añade otro automáticamente.
+> **PELIGRO - MOVIMIENTO FÍSICO:** no asuma que `X= 0` es una posición
+> mecánicamente segura. Confirme primero el cero y las cuentas actuales en
+> `rpi/estadopockets.sh`. Evite saltos grandes y detenga la prueba si el eje se
+> mueve en sentido incorrecto, no converge, activa un switch o presenta
+> oscilaciones.
 
-1. Abra el lazo y fuerce salida cero:
+Para mover en unidades de usuario mediante el intérprete principal:
 
-   ```bash
-   ejear DAX 0
-   ejear RST_S ERROR_MAXX 0
-   ```
+```bash
+ag2m 'AR= 1'
+ag2m 'AR= 0'
+```
 
-2. Aplique parámetros iniciales conservadores, un cambio a la vez:
-
-   ```bash
-   ejear KPX 1 KIX 0 KDX 0 ILX 4000 BITIX 4 VX= 1 AX= 0.001
-   ```
-
-3. Cierre el lazo sólo cuando el objetivo guardado sea seguro:
-
-   ```bash
-   ejear CONTROL_PIDX
-   ```
-
-4. Mueva por cuentas para evaluar directamente el servo:
-
-   ```bash
-   ejear X= 1000
-   ejear X= 0
-   ```
-
-5. Mueva en unidades de usuario mediante el intérprete:
-
-   ```bash
-   ag2m 'AR= 1'
-   ag2m 'AR= 0'
-   ```
-
-6. Aumente `KPX` gradualmente hasta obtener respuesta firme sin oscilación
+1. Aumente `KPX` gradualmente hasta obtener respuesta firme sin oscilación
    sostenida. Si aparece oscilación, reduzca `KPX`.
-7. Introduzca `KDX` poco a poco para amortiguar sobreimpulso. Un valor excesivo
+2. Introduzca `KDX` poco a poco para amortiguar sobreimpulso. Un valor excesivo
    puede amplificar ruido.
-8. Introduzca `KIX` lentamente para reducir error estacionario. Vigile la
+3. Introduzca `KIX` lentamente para reducir error estacionario. Vigile la
    acumulación integral y ajuste `ILX` para limitarla.
-9. Ajuste `VX` y `AX` conservadoramente. Son límites de velocidad y
+4. Ajuste `VX` y `AX` conservadoramente. Son límites de velocidad y
    aceleración de trayectoria; aumentarlos incrementa la exigencia mecánica.
-10. Ajuste `CGANX` sólo cuando se comprenda su efecto en el servo del eje.
-11. Mantenga `ERROR_MAXX` como protección durante la entonación; no deje el
-    valor `0` como configuración persistente.
-12. Repita movimientos positivos y negativos de distintas amplitudes.
+5. Ajuste `CGANX` sólo cuando se comprenda su efecto en el servo del eje.
+6. Mantenga `ERROR_MAXX` como protección durante la entonación; no deje el
+   valor `0` como configuración persistente.
+7. Repita movimientos positivos y negativos de distintas amplitudes.
 
 ### Criterios de evaluación
 
