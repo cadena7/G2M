@@ -1,0 +1,21 @@
+{
+  "version": "g2m-2026-05-14",
+  "AR": {
+    "unidad": "arcsec",
+    "switch_min": -1911.02,
+    "switch_max": 1744.23,
+    "margen": 10.0
+  },
+  "DEC": {
+    "unidad": "arcsec",
+    "switch_min": -2482.26,
+    "switch_max": 1116.11,
+    "margen": 10.0
+  },
+  "FOCO": {
+    "unidad": "mm",
+    "switch_min": -49.39,
+    "switch_max": 76.31,
+    "margen": 3.0
+  }
+}

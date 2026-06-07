@@ -10,7 +10,7 @@ import re
 # de preferencia mayor a 5s para que inicien otros servicios primero
 RETARDO_INICIO_S = 7
 
-PREFIX = "oan/control/2m/guiador/motores/"   # <-- AJUSTA a tu Telescopio
+PREFIX = "oan/control/2m/guiador/motores/"    # <-- AJUSTA a tu Telescopio
 BROKER_HOST = "192.168.0.237"                 # <-- AJUSTA a tu broker MQTT
 BROKER_PORT = 1883
 
