@@ -39,23 +39,29 @@ edog2mj
 
 
 
-
+#mandar posiciones de pulsos de codificador
 ejedec X= 0  FCMD
 ejear X= 0  FCMD
 ejefoco X= 0  FCMD
 
 
 
-ejedec X= 10000  FCMD
+ejedec X= 1000  FCMD
 ejear X= 10000  FCMD
 ejefoco X= 10000  FCMD
 
 
 
-ejedec X= -10000  FCMD
+ejedec X= -1000  FCMD
 ejear X= -10000  FCMD
 ejefoco X= -10000  FCMD
 
+
+
+#mandar posiciones de eje en unidades astronomicas
+ag2m AR= 200 FCMD
+ag2m DEC= 200 FCMD
+ag2m FOCO= 5 FCMD
 
 
 
