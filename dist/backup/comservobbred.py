@@ -1,8 +1,6 @@
 
 import time
 import socket
-import math
-import re
 
 
 from  cinterprete import Interprete 
@@ -40,35 +38,35 @@ def manda( str1 , ELIP,ELPORT):
         print("No mando: ", str1, "intento:",ntry )
         return "Nada"
 
-    try:
-        s.sendall(str2.encode('utf-8'))
-        total_data = []
-        deadline = time.monotonic() + 2.0
-        while time.monotonic() < deadline:
+    s.sendall( str2.encode('utf-8'  ) )
+    time.sleep( 0.25 )
+    total_data=[]
+    while True:
+        data = b''
+        try:
             data = s.recv(1024)
-            if not data:
-                break
-            total_data.append(data)
-            if b'OK' in b''.join(total_data).upper():
-                break
-        response = b''.join(total_data).decode('utf-8')
-        if not response.strip() or not re.search(r'\bOK\b', response, re.I):
-            raise ValueError("Respuesta incompleta del servo")
-        if re.search(r'\b(?:ERR|ERROR|NADA)\b', response, re.I):
-            raise ValueError("Respuesta de error del servo")
-        return response
-    except (OSError, UnicodeError, ValueError) as exc:
-        print(f"Servo {ELIP}: {exc}")
-        return "Nada"
-    finally:
-        s.close()
+        except Exception as e:
+            print("EXC: ",e )
+            pass
+        if not data:
+            break
+        total_data.append(data)
+        #print( "DATA",total_data )
+        td = b''.join(total_data)
+        if b'Ok' in td:
+            break
+    total_data = b''.join(total_data)
+    s.close()
+    data1 = str( total_data , 'UTF-8')
+    ## data1 = total_data.replace("=", " ")
+    ##print "DATA1",data1
+    return( data1 )
 
 
 
 class ComServoRed:
     def __init__(self):
         self.host = "192.168.10.2"
-        self.ultimo_estado_valido = 0.0
         self.posicion = 0
         self.posicionDeseada = 0
         self.posicionDeseadaSP = 0
@@ -127,9 +125,6 @@ class ComServoRed:
 
     def manda_s(self, str1 ):
         res = manda( str1, self.host, 9095 )
-        if res == "Nada":
-            self.datos['ENLINEA'] = 0
-            self.ultimo_estado_valido = 0.0
         return res
 
     def fn_ca_ahd(self):
@@ -247,17 +242,15 @@ class ComServoRed:
 
     def pide_estado(self):
         s = manda('ESTADO', self.host, 9095)
-        # No confundir una conexion TCP abierta con una lectura de posicion.
-        match = re.search(r'\bX\s*(?:=\s*)?([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s*(?=\s|$)', s)
-        if s == "Nada" or match is None or not math.isfinite(float(match.group(1))):
+        s2 = s.replace("="," ")
+        s2 = s2.replace("\n"," ")
+        if s2 == "Nada" :
             self.datos['ENLINEA'] = 0
-            self.ultimo_estado_valido = 0.0
+            print("No se pudo conectar")
             return
-        self.miInt.interpreta(s.replace("=", " ").replace("\n", " "))
-        self.datos['X'] = float(match.group(1))
-        self.ultimo_estado_valido = time.monotonic()
         self.datos['ENLINEA'] = 1
-
+        print("Interpreta ",s2)
+        self.miInt.interpreta( s2)
 
 
     def mueve_x(self,pos):

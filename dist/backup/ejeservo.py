@@ -61,29 +61,21 @@ class Eje:
             m = self.colaMsg.get()
             if self.debug :
                 print(f"HEBRA {self.nombre} {m}")
-            try:
-                if m[0] == 'E' :
-                    self.mot.pide_estado()
-                if m[0] == 'M' :
-                    self.mueve( m[1] )
-                if m[0] == 'R' : # mueve relativo
-                    self.mueve_rel( m[1] )
-                if m[0] == 'C' :
-                    res = self.mot.manda_s( m[1] )
-                    print(res)
-                if m[0] == 'X' :
-                    # cancela la busqueda de inicio
-                    self.buscando_inicio = False
-            except Exception as exc:
-                # Una falla de un eje no debe matar su hilo ni afectar los otros.
-                self.mot.datos['ENLINEA'] = 0
-                self.mot.ultimo_estado_valido = 0.0
-                print(f"Error de comunicacion {self.nombre}: {exc}")
+            if m[0] == 'E' :
+                self.mot.pide_estado()
+            if m[0] == 'M' :
+                self.mueve( m[1] )
+            if m[0] == 'R' : # mueve relativo
+                self.mueve_rel( m[1] )
+            if m[0] == 'C' :
+                res = self.mot.manda_s( m[1] )
+                print(res)
+            if m[0] == 'X' :
+                # cancela la busqueda de inicio
+                self.buscando_inicio = False
             time.sleep(0.02)
 
     def pide_estado_q(self):
-        if time.monotonic() - self.mot.ultimo_estado_valido > 5.0:
-            self.mot.datos['ENLINEA'] = 0
         self.colaMsg.put(('E','NADA'))
 
     def mueve_q(self,pos):

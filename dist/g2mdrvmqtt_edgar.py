@@ -5,6 +5,7 @@ import aiomqtt
 import json
 import os
 import re
+import math
 
 # ===================== CONFIG (AJUSTA ESTO) =====================
 # de preferencia mayor a 5s para que inicien otros servicios primero
@@ -20,6 +21,18 @@ TCP_PORT = 9055
 DEF_LIMITES_CONF_ARCH = "/home/guiador/config/limites-motores-guiador-2m.json"
 DEF_CERO_OFFSETS_ARCH = "/home/guiador/config/offsets-cero-mecanicos-2m.json"
 POSICION_VALIDA_TIMEOUT_S = 5.0
+TCP_TIMEOUT_S = 5.0
+# Unidades de usuario: arcsec, arcsec, mm, grados. Umbrales de aviso,
+# no bloquean movimientos. Ajustar con tiempos medidos en el equipo.
+TOLERANCIA_MOVIMIENTO = {"AR": 0.4, "DEC": 0.4, "FOCO": 0.4, "ZOOM": 0.2}
+SIN_AVANCE_TIMEOUT_S = 30.0
+# Avance neto minimo hacia el destino, acumulable entre lecturas.
+# Separado de la tolerancia final para no contar ruido como recuperacion.
+AVANCE_MINIMO = {"AR": 0.2, "DEC": 0.2, "FOCO": 0.02, "ZOOM": 0.1}
+VELOCIDAD_MIN_ESPERADA = {"AR": 10.0, "DEC": 10.0, "FOCO": 0.1, "ZOOM": 1.0}
+AVISOS_EJES = {}
+MOVIMIENTOS = {}
+ERRORES_MOVIMIENTO = {}
 MARGEN_LIMITE_AR_DEC = 10.0
 MARGEN_LIMITE_FOCO = 3.0
 EJES_GUIADOR = ("AR", "DEC", "FOCO")
@@ -175,12 +188,18 @@ def limita_valor_mecanico(eje, valor):
     return valor_limitado, valor_limitado != valor_float
 
 
-def registra_aviso(avisos):
+def registra_aviso(avisos, ejes=None):
     global LIMITE_ACTIVO
     global ULTIMO_AVISO
-    LIMITE_ACTIVO = bool(avisos)
-    ULTIMO_AVISO = " | ".join(avisos)
-    if ULTIMO_AVISO:
+    if ejes is not None:
+        for eje in ejes:
+            AVISOS_EJES.pop(eje, None)
+    for aviso in avisos:
+        eje = aviso.split(":", 1)[0]
+        AVISOS_EJES[eje] = aviso
+    LIMITE_ACTIVO = bool(AVISOS_EJES)
+    ULTIMO_AVISO = " | ".join(AVISOS_EJES.values())
+    if avisos:
         print(f"[LIMITES] {ULTIMO_AVISO}")
 
 
@@ -188,18 +207,26 @@ def actualiza_estado_cache(datos, ahora=None):
     if ahora is None:
         ahora = time.time()
     if not isinstance(datos, dict) or datos.get("ERROR"):
+        for eje in POS_VALIDAS:
+            POS_VALIDAS[eje] = False
         return False
     actualizado = False
-    for eje in EJES_GUIADOR:
-        if eje not in datos:
+    for eje in TOLERANCIA_MOVIMIENTO:
+        POS_VALIDAS[eje] = False
+        if eje not in datos or datos.get("ERROR_COM_" + eje):
             continue
         try:
-            ULTIMO_ESTADO[eje] = float(datos[eje])
+            posicion = float(datos[eje])
+            if not math.isfinite(posicion):
+                continue
+            ULTIMO_ESTADO[eje] = posicion
         except (TypeError, ValueError):
             continue
         POS_VALIDAS[eje] = True
         T_ULTIMA_POSICION[eje] = ahora
         actualizado = True
+        if AVISOS_EJES.get(eje) in (f"{eje}: sin posicion reciente", f"{eje}: posicion invalida"):
+            registra_aviso([], ejes=(eje,))
     aplica_reset_offset_si_corresponde(datos)
     return actualizado
 
@@ -230,7 +257,7 @@ def limita_mueve_absoluto(data):
         seguro[eje] = aplicado
         if cambio:
             avisos.append(f"{eje}: solicitado {solicitado:.2f}, aplicado {aplicado:.2f}")
-    registra_aviso(avisos)
+    registra_aviso(avisos, ejes=data)
     return seguro
 
 
@@ -262,7 +289,7 @@ def limita_mueve_relativo(data, ahora=None):
             seguro[eje] = aplicado
         if cambio:
             avisos.append(f"{eje}: solicitado {solicitado:.2f}, aplicado {aplicado:.2f}")
-    registra_aviso(avisos)
+    registra_aviso(avisos, ejes=data)
     return seguro
 
 
@@ -293,7 +320,7 @@ def filtra_define_coordenadas(data, ahora=None):
     if cambio:
         guarda_offsets_cero()
         marca_config_sucia()
-    registra_aviso(avisos)
+    registra_aviso(avisos, ejes=datos)
     return seguro
 
 
@@ -334,20 +361,93 @@ LIMITE_ACTIVO = False
 ULTIMO_AVISO = ""
 
 
+def registra_movimientos(destinos, respuesta):
+    ahora = time.monotonic()
+    ok = bool(re.search(r"\bOK\s*$", respuesta, re.I)) and not re.search(r"\bERR(?:OR)?\b", respuesta, re.I)
+    for eje, destino in destinos.items():
+        destino = usuario_a_mecanico(eje, destino)
+        origen = usuario_a_mecanico(eje, ULTIMO_ESTADO.get(eje, destino - OFFSETS_CERO.get(eje, 0.0)))
+        plazo = 30.0 + abs(destino - origen) / VELOCIDAD_MIN_ESPERADA[eje]
+        anterior = MOVIMIENTOS.get(eje)
+        referencia = None
+        if POS_VALIDAS.get(eje, False) and eje in ULTIMO_ESTADO:
+            referencia = usuario_a_mecanico(eje, ULTIMO_ESTADO[eje])
+        ultimo_avance = ahora
+        if anterior is not None:
+            # Otra orden cambia el destino, pero no demuestra avance fisico.
+            ultimo_avance = anterior["ultimo_avance"]
+            referencia = anterior["referencia_avance"]
+            if POS_VALIDAS.get(eje, False) and eje in ULTIMO_ESTADO:
+                actual = usuario_a_mecanico(eje, ULTIMO_ESTADO[eje])
+                if (anterior["destino"] - actual) * (destino - actual) < 0:
+                    # Cambio de sentido: reubicar la referencia sin dar mas tiempo.
+                    referencia = actual
+        MOVIMIENTOS[eje] = {
+            "destino": destino,
+            "vence": ahora + plazo,
+            "ultimo_avance": ultimo_avance,
+            "referencia_avance": referencia,
+        }
+        if not ok:
+            ERRORES_MOVIMIENTO[eje] = "no se confirmo el envio del movimiento"
+
+
+def revisa_movimientos(datos):
+    ahora = time.monotonic()
+    for eje, movimiento in list(MOVIMIENTOS.items()):
+        if datos.get("INICIANDO_" + eje):
+            MOVIMIENTOS.pop(eje, None)
+            ERRORES_MOVIMIENTO.pop(eje, None)
+            continue
+        if datos.get("ERROR_COM_" + eje) or eje not in datos:
+            continue
+        try:
+            actual = usuario_a_mecanico(eje, float(datos[eje]))
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(actual):
+            continue
+        if abs(actual - movimiento["destino"]) <= TOLERANCIA_MOVIMIENTO[eje]:
+            MOVIMIENTOS.pop(eje, None)
+            ERRORES_MOVIMIENTO.pop(eje, None)
+            continue
+        referencia = movimiento["referencia_avance"]
+        if referencia is None:
+            # La primera lectura establece origen, no prueba movimiento.
+            movimiento["referencia_avance"] = actual
+        else:
+            avance = abs(referencia - movimiento["destino"]) - abs(actual - movimiento["destino"])
+            if avance >= AVANCE_MINIMO[eje]:
+                movimiento["referencia_avance"] = actual
+                movimiento["ultimo_avance"] = ahora
+                if ERRORES_MOVIMIENTO.get(eje) == "sin avance hacia el destino":
+                    ERRORES_MOVIMIENTO.pop(eje, None)
+        if ahora - movimiento["ultimo_avance"] >= SIN_AVANCE_TIMEOUT_S:
+            ERRORES_MOVIMIENTO[eje] = "sin avance hacia el destino"
+        elif ahora >= movimiento["vence"]:
+            ERRORES_MOVIMIENTO[eje] = "destino no alcanzado"
+
+
 # ===================== TCP hacia driver =====================
 async def manda(data: str) -> str:
+    writer = None
     try:
-        reader, writer = await asyncio.open_connection(TCP_HOST, TCP_PORT)
+        reader, writer = await asyncio.wait_for(
+            asyncio.open_connection(TCP_HOST, TCP_PORT), TCP_TIMEOUT_S)
         writer.write(data.encode())
-        await writer.drain()
-        data_rec = await reader.read(1024)
-        response = data_rec.decode()
-        writer.close()
-        await writer.wait_closed()
-        return response
+        await asyncio.wait_for(writer.drain(), TCP_TIMEOUT_S)
+        data_rec = await asyncio.wait_for(reader.read(), TCP_TIMEOUT_S)
+        return data_rec.decode()
     except Exception as e:
         print(f"[TCP] Error en manda: {e}")
         return "ERROR"
+    finally:
+        if writer is not None:
+            writer.close()
+            try:
+                await asyncio.wait_for(writer.wait_closed(), TCP_TIMEOUT_S)
+            except (OSError, asyncio.TimeoutError):
+                pass
 
 
 def pela_msg_egj(data: str) -> str:
@@ -368,9 +468,11 @@ async def pide_estado() -> dict:
         return datos
     except json.decoder.JSONDecodeError as error:
         print("[ESTADO] JSONDecodeError:", error)
+        actualiza_estado_cache({"ERROR": True})
         return {"ERROR": True}
     except Exception as e:
         print(f"[ESTADO] Error en pide_estado: {e}")
+        actualiza_estado_cache({"ERROR": True})
         return {"ERROR": True}
 
 
@@ -392,11 +494,13 @@ async def publica_config(cliente) -> None:
 
 
 async def publica_estado(cliente, datos: dict) -> None:
-    # Si el estado viene malo, no publiques
-    if not isinstance(datos, dict) or 'ERROR' in datos:
-        return
+    if not isinstance(datos, dict):
+        datos = {"ERROR": True}
+    if not datos.get("ERROR"):
+        revisa_movimientos(datos)
     try:
         datos_pub = dict(datos)
+        datos_pub["ERRORES_MOVIMIENTO"] = dict(ERRORES_MOVIMIENTO)
         datos_pub["LIMITE_ACTIVO"] = LIMITE_ACTIVO
         datos_pub["ULTIMO_AVISO"] = ULTIMO_AVISO
         datos_pub.update(config_autoritaria_payload())
@@ -431,7 +535,8 @@ async def procesa_msg_mueve(cliente, msg: bytes):
             res += " %s= %f" % (nom, data[nom])
     if len(res) <= 1:
         return
-    await manda(res)
+    respuesta = await manda(res)
+    registra_movimientos({e: data[e] for e in TOLERANCIA_MOVIMIENTO if e in data}, respuesta)
 
 
 async def procesa_msg_mueve_relativo(cliente, msg: bytes):
@@ -446,13 +551,19 @@ async def procesa_msg_mueve_relativo(cliente, msg: bytes):
             res += " PON_INC_%s= %.2f  %s " % (nom, data[nom], cmds[ind])
     if len(res) <= 1:
         return
-    await manda(res)
+    destinos = {e: ULTIMO_ESTADO[e] + data[e] for e in TOLERANCIA_MOVIMIENTO
+                if e in data and e in ULTIMO_ESTADO}
+    respuesta = await manda(res)
+    registra_movimientos(destinos, respuesta)
 
 
 async def procesa_msg_inicia_ejes(cliente, msg: bytes):
     await asyncio.sleep(0.1)
     data = msg_a_json(msg)
     marca_reset_offset(data)
+    for eje in data:
+        MOVIMIENTOS.pop(eje, None)
+        ERRORES_MOVIMIENTO.pop(eje, None)
     res = ""
     for nom in ('AR', 'DEC', 'FOCO', 'ZOOM'):
         if nom in data:
@@ -499,6 +610,10 @@ async def procesa_msg_def_coords(cliente, msg: bytes):
     if len(res) <= 1:
         return
     await manda(res)
+    for eje in data:
+        MOVIMIENTOS.pop(eje, None)
+    if 'ZOOM' in data_original:
+        MOVIMIENTOS.pop('ZOOM', None)
     if data:
         await publica_config(cliente)
 
